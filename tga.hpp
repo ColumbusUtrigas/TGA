@@ -32,7 +32,6 @@ namespace tga
         WRITEPIXEL24(a) \
 		*a++ = alpha;
 
-	#pragma pack(1)
 	struct Header
 	{
 		uint8_t idlen;
@@ -91,7 +90,18 @@ namespace tga
 			FileSize = File.tellg();
 			File.seekg(0, std::ios_base::beg);
 
-			File.read((char*)&Head, sizeof(Header));
+			File.read((char*)&Head.idlen,                sizeof(Head.idlen));
+			File.read((char*)&Head.color_map_type,       sizeof(Head.color_map_type));
+			File.read((char*)&Head.image_type,           sizeof(Head.image_type));
+			File.read((char*)&Head.color_map_origin,     sizeof(Head.color_map_origin));
+			File.read((char*)&Head.color_map_length,     sizeof(Head.color_map_length));
+			File.read((char*)&Head.color_map_entry_size, sizeof(Head.color_map_entry_size));
+			File.read((char*)&Head.x_origin,             sizeof(Head.x_origin));
+			File.read((char*)&Head.y_origin,             sizeof(Head.y_origin));
+			File.read((char*)&Head.width,                sizeof(Head.width));
+			File.read((char*)&Head.height,               sizeof(Head.height));
+			File.read((char*)&Head.bits,                 sizeof(Head.bits));
+			File.read((char*)&Head.image_descriptor,     sizeof(Head.image_descriptor));
 				
 			uint8_t* Descriptor = new uint8_t[Head.image_descriptor];
 			File.read((char*)Descriptor, Head.image_descriptor);
