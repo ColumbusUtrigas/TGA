@@ -38,7 +38,8 @@ uint8_t* tga_load_memory(uint8_t* Data, int Size, int* Width, int* Height, int* 
 
 static void tga_load_compressed_paletted_8(uint8_t* InBuffer, uint8_t* ColorMap, uint8_t* OutBuffer, size_t Size, size_t PixelSize);
 static void tga_load_compressed_paletted_16(uint16_t* InBuffer, uint8_t* ColorMap, uint8_t* OutBuffer, size_t Size, size_t PixelSize);
-static void tga_load_compressed_true_color(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size, size_t PixelSize);
+static void tga_load_compressed_true_color_24(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size);
+static void tga_load_compressed_true_color_32(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size);
 static void tga_load_compressed_monochrome(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size);
 
 void tga_load_compressed_paletted_8(uint8_t* InBuffer, uint8_t* ColorMap, uint8_t* OutBuffer, size_t Size, size_t PixelSize)
@@ -77,10 +78,10 @@ void tga_load_compressed_paletted_16(uint16_t* InBuffer, uint8_t* ColorMap, uint
 	}
 }
 
-void tga_load_compressed_true_color(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size, size_t PixelSize)
+static void tga_load_compressed_true_color_24(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size)
 {
 	uint8_t Header;
-	uint8_t Pixel[4], Tmp;
+	uint8_t Pixel[3];
 	size_t i, j, PixelCount;
 
 	for (i = 0; i < Size; )
@@ -90,12 +91,13 @@ void tga_load_compressed_true_color(uint8_t* InBuffer, uint8_t* OutBuffer, size_
 
 		if (Header & 0x80)
 		{
-			memcpy(Pixel, InBuffer, PixelSize); InBuffer += PixelSize;
-			Tmp = Pixel[0]; Pixel[0] = Pixel[2]; Pixel[2] = Tmp;
+			Pixel[2] = *InBuffer++;
+			Pixel[1] = *InBuffer++;
+			Pixel[0] = *InBuffer++;
 
 			for (j = 0; j < PixelCount; j++)
 			{
-				memcpy(OutBuffer, Pixel, PixelSize); OutBuffer += PixelSize;
+				memcpy(OutBuffer, Pixel, 3); OutBuffer += 3;
 			}
 
 			i += PixelCount;
@@ -104,10 +106,54 @@ void tga_load_compressed_true_color(uint8_t* InBuffer, uint8_t* OutBuffer, size_
 		{
 			for (j = 0; j < PixelCount; j++)
 			{
-				memcpy(Pixel, InBuffer, PixelSize); InBuffer += PixelSize;
-				Tmp = Pixel[0]; Pixel[0] = Pixel[2]; Pixel[2] = Tmp;
-				memcpy(OutBuffer, Pixel, PixelSize); OutBuffer += PixelSize;
+				Pixel[2] = *InBuffer++;
+				Pixel[1] = *InBuffer++;
+				Pixel[0] = *InBuffer++;
+				memcpy(OutBuffer, Pixel, 3); OutBuffer += 3;
 			}
+
+			i += PixelCount;
+		}
+	}
+}
+
+static void tga_load_compressed_true_color_32(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size)
+{
+	uint8_t Header;
+	uint8_t Pixel[4];
+	size_t i, j, PixelCount;
+
+	for (i = 0; i < Size; )
+	{
+		Header = *InBuffer++;
+		PixelCount = (Header & 0x7F) + 1;
+
+		if (Header & 0x80)
+		{
+			Pixel[2] = *InBuffer++;
+			Pixel[1] = *InBuffer++;
+			Pixel[0] = *InBuffer++;
+			Pixel[3] = *InBuffer++;
+
+			for (j = 0; j < PixelCount; j++)
+			{
+				memcpy(OutBuffer, Pixel, 4); OutBuffer += 4;
+			}
+
+			i += PixelCount;
+		}
+		else
+		{
+			for (j = 0; j < PixelCount; j++)
+			{
+				Pixel[2] = *InBuffer++;
+				Pixel[1] = *InBuffer++;
+				Pixel[0] = *InBuffer++;
+				Pixel[3] = *InBuffer++;
+
+				memcpy(OutBuffer, Pixel, 4); OutBuffer += 4;
+			}
+
 			i += PixelCount;
 		}
 	}
@@ -268,9 +314,10 @@ uint8_t* tga_load_memory(uint8_t* Data, int Size, int* Width, int* Height, int* 
 		case 9: break; // Compressed paletted TODO
 		case 10: // Compressed TrueColor
 		{
-			if (PixelSize == 3 || PixelSize == 4)
+			switch (Header.Bits)
 			{
-				tga_load_compressed_true_color(Data, Result, Header.Width * Header.Height, PixelSize);
+			case 24: tga_load_compressed_true_color_24(Data, Result, Header.Width * Header.Height); break;
+			case 32: tga_load_compressed_true_color_32(Data, Result, Header.Width * Header.Height); break;
 			}
 
 			break;
