@@ -1,14 +1,14 @@
 #pragma once
 
-/*!
-* @file tga.h
-* @brief All C library functional.
-*/
-
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+/*!
+* @file tga.h
+* @brief All C library functional.
+*/
 
 /**
 * @brief Loads TGA from file.
