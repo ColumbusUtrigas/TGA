@@ -7,53 +7,57 @@
 
 /*!
 * @file tga.hpp
-* @brief Library header wth all functional.
+* @brief All C++ library functional.
 */
 
 namespace tga
 {
 
-#define READPIXEL8(a) \
-        red = *a++;
-
-#define READPIXEL24(a) \
-        blue = *a++;   \
-        green = *a++;  \
-        red = *a++;
-
-#define READPIXEL32(a) \
-        READPIXEL24(a) \
-        alpha = *a++;
-
-#define WRITEPIXEL8(a) \
-        *a++ = red;
-
-#define WRITEPIXEL24(a) \
-        *a++ = red;     \
-        *a++ = green;   \
-        *a++ = blue;
-
-#define WRITEPIXEL32(a) \
-        WRITEPIXEL24(a) \
-		*a++ = alpha;
-
-	static struct Header
+	template <typename Type>
+	static void ReadPixel8(Type*& Buffer, Type& Red)
 	{
-		uint8_t idlen;
-		uint8_t color_map_type;
-		uint8_t image_type;
+		Red = *Buffer++;
+	}
 
-		uint16_t color_map_origin;
-		uint16_t color_map_length;
-		uint8_t color_map_entry_size;
+	template <typename Type>
+	static void ReadPixel24(Type*& Buffer, Type& Red, Type& Green, Type& Blue)
+	{
+		Blue = *Buffer++;
+		Green = *Buffer++;
+		Red = *Buffer++;
+	}
 
-		uint16_t x_origin;
-		uint16_t y_origin;
-		uint16_t width;
-		uint16_t height;
-		uint8_t bits;
-		uint8_t image_descriptor;
-	};
+	template <typename Type>
+	static void ReadPixel32(Type*& Buffer, Type& Red, Type& Green, Type& Blue, Type& Alpha)
+	{
+		Blue = *Buffer++;
+		Green = *Buffer++;
+		Red = *Buffer++;
+		Alpha = *Buffer++;
+	}
+
+	template <typename Type>
+	static void WritePixel8(Type*& Buffer, Type Red)
+	{
+		*Buffer++ = Red;
+	}
+
+	template <typename Type>
+	static void WritePixel24(Type*& Buffer, Type Red, Type Green, Type Blue)
+	{
+		*Buffer++ = Red;
+		*Buffer++ = Green;
+		*Buffer++ = Blue;
+	}
+
+	template <typename Type>
+	static void WritePixel32(Type*& Buffer, Type Red, Type Green, Type Blue, Type Alpha)
+	{
+		*Buffer++ = Red;
+		*Buffer++ = Green;
+		*Buffer++ = Blue;
+		*Buffer++ = Alpha;
+	}
 
 	/*
 	* @brief Format of loaded image.
@@ -89,6 +93,24 @@ namespace tga
 	class TGA
 	{
 	private:
+		struct Header
+		{
+			uint8_t IDLength;
+			uint8_t ColorMapType;
+			uint8_t ImageType;
+
+			uint16_t ColorMapOrigin;
+			uint16_t ColorMapLength;
+			uint8_t  ColorMapEntrySize;
+
+			uint16_t XOrigin;
+			uint16_t YOrigin;
+			uint16_t Width;
+			uint16_t Height;
+			uint8_t  Bits;
+			uint8_t  ImageDescriptor;
+		};
+	private:
 		uint8_t* Data;
 		uint64_t Size;
 		uint32_t Width;
@@ -113,8 +135,20 @@ namespace tga
 		uint32_t GetHeight() const { return Height; }
 		ImageFormat GetFormat() const { return Format; }
 
+		void Clear()
+		{
+			delete[] Data;
+			Size = 0;
+			Width = 0;
+			Height = 0;
+			Format = ImageFormat::Undefined;
+		}
+
 		/**
 		* @brief Loads image.
+		*
+		* **This function clears data i.e. invalidates data pointer.**
+		*
 		* @param Filename Image filename.
 		* @return true if success, otherwise false.
 		*/
@@ -122,7 +156,7 @@ namespace tga
 
 		~TGA()
 		{
-			delete[] Data;
+			Clear();
 		}
 	};
 
@@ -130,8 +164,8 @@ namespace tga
 	void TGA::RGBPaletted(Type* InBuffer, uint8_t* ColorMap, uint8_t* OutBuffer, size_t Size)
 	{
 		const int PixelSize = 3;
-		int Index;
-		int red, green, blue;
+		Type Index;
+		uint8_t Red, Green, Blue;
 		uint8_t* ColorMapPtr;
 
 		for (size_t i = 0; i < Size; i++)
@@ -139,8 +173,8 @@ namespace tga
 			Index = InBuffer[i];
 			ColorMapPtr = &ColorMap[Index * PixelSize];
 
-			READPIXEL24(ColorMapPtr);
-			WRITEPIXEL24(OutBuffer);
+			ReadPixel24(ColorMapPtr, Red, Green, Blue);
+			WritePixel24(OutBuffer, Red, Green, Blue);
 		}
 	}
 
@@ -148,8 +182,8 @@ namespace tga
 	void TGA::RGBAPaletted(Type* InBuffer, uint8_t* ColorMap, uint8_t* OutBuffer, size_t Size)
 	{
 		const int PixelSize = 4;
-		int Index;
-		int red, green, blue, alpha;
+		Type Index;
+		uint8_t Red, Green, Blue, Alpha;
 		uint8_t* ColorMapPtr;
 
 		for (size_t i = 0; i < Size; i++)
@@ -157,113 +191,119 @@ namespace tga
 			Index = InBuffer[i];
 			ColorMapPtr = &ColorMap[Index * PixelSize];
 
-			READPIXEL32(ColorMapPtr);
-			WRITEPIXEL32(OutBuffer);
+			ReadPixel32(ColorMapPtr, Red, Green, Blue, Alpha);
+			WritePixel32(OutBuffer, Red, Green, Blue, Alpha);
 		}
 	}
 
 	void TGA::MonochromeCompressed(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size)
 	{
-		int header;
-		int red;
-		size_t pixelcount;
+		uint8_t Header;
+		uint8_t Red;
+		size_t i, j, PixelCount;
 
-		for (size_t i = 0; i < Size; )
+		for (i = 0; i < Size; )
 		{
-			header = *InBuffer++;
-			pixelcount = (header & 0x7F) + 1;
+			Header = *InBuffer++;
+			PixelCount = (Header & 0x7F) + 1;
 
-			if (header & 0x80)
+			if (Header & 0x80)
 			{
-				READPIXEL8(InBuffer);
-				for (size_t j = 0; j < pixelcount; j++)
+				ReadPixel8(InBuffer, Red);
+
+				for (j = 0; j < PixelCount; j++)
 				{
-					WRITEPIXEL8(OutBuffer);
+					WritePixel8(OutBuffer, Red);
 				}
-				i += pixelcount;
+
+				i += PixelCount;
 			}
 			else
 			{
-				for (size_t j = 0; j < pixelcount; j++)
+				for (j = 0; j < PixelCount; j++)
 				{
-					READPIXEL8(InBuffer);
-					WRITEPIXEL8(OutBuffer);
+					ReadPixel8(InBuffer, Red);
+					WritePixel8(OutBuffer, Red);
 				}
-				i += pixelcount;
+
+				i += PixelCount;
 			}
 		}
 	}
 
 	void TGA::RGBCompressed(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size)
 	{
-		int header;
-		int blue, green, red;
-		size_t i, j, pixelcount;
+		uint8_t Header;
+		uint8_t Red, Green, Blue;
+		size_t i, j, PixelCount;
 
 		for (i = 0; i < Size; )
 		{
-			header = *InBuffer++;
-			pixelcount = (header & 0x7F) + 1;
+			Header = *InBuffer++;
+			PixelCount = (Header & 0x7F) + 1;
 
-			if (header & 0x80)
+			if (Header & 0x80)
 			{
-				READPIXEL24(InBuffer);
-				for (j = 0; j < pixelcount; j++)
+				ReadPixel24(InBuffer, Red, Green, Blue);
+
+				for (j = 0; j < PixelCount; j++)
 				{
-					WRITEPIXEL24(OutBuffer);
+					WritePixel24(OutBuffer, Red, Green, Blue);
 				}
-				i += pixelcount;
+
+				i += PixelCount;
 			}
 			else
 			{
-				for (j = 0; j < pixelcount; j++)
+				for (j = 0; j < PixelCount; j++)
 				{
-					READPIXEL24(InBuffer);
-					WRITEPIXEL24(OutBuffer);
+					ReadPixel24(InBuffer, Red, Green, Blue);
+					WritePixel24(OutBuffer, Red, Green, Blue);
 				}
-				i += pixelcount;
+				i += PixelCount;
 			}
 		}
 	}
 
 	void TGA::RGBACompressed(uint8_t* InBuffer, uint8_t* OutBuffer, size_t Size)
 	{
-		int header;
-		int blue, green, red, alpha;
-		int pix;
-		size_t i, j, pixelcount;
+		uint8_t Header;
+		uint8_t Red, Green, Blue, Alpha;
+		size_t i, j, PixelCount;
 
 		for (i = 0; i < Size; )
 		{
-			header = *InBuffer++;
-			pixelcount = (header & 0x7F) + 1;
-			if (header & 0x80)
-			{
-				READPIXEL32(InBuffer);
-				pix = red | (green << 8) | (blue << 16) | (alpha << 24);
+			Header = *InBuffer++;
+			PixelCount = (Header & 0x7F) + 1;
 
-				for (j = 0; j < pixelcount; j++)
+			if (Header & 0x80)
+			{
+				ReadPixel32(InBuffer, Red, Green, Blue, Alpha);
+
+				for (j = 0; j < PixelCount; j++)
 				{
-					memcpy(OutBuffer, &pix, 4);
-					OutBuffer += 4;
+					WritePixel32(OutBuffer, Red, Green, Blue, Alpha);
 				}
 
-				i += pixelcount;
+				i += PixelCount;
 			}
 			else
 			{
-				for (j = 0; j < pixelcount; j++)
+				for (j = 0; j < PixelCount; j++)
 				{
-					READPIXEL32(InBuffer);
-					WRITEPIXEL32(OutBuffer);
+					ReadPixel32(InBuffer, Red, Green, Blue, Alpha);
+					WritePixel32(OutBuffer, Red, Green, Blue, Alpha);
 				}
-				i += pixelcount;
+
+				i += PixelCount;
 			}
 		}
 	}
 
 	bool TGA::Load(const std::string& Filename)
 	{
+		Clear();
+
 		std::ifstream File(Filename, std::ios::binary);
 		if (!File.is_open()) return false;
 
@@ -274,34 +314,34 @@ namespace tga
 		FileSize = File.tellg();
 		File.seekg(0, std::ios_base::beg);
 
-		File.read((char*)&Head.idlen,                sizeof(Head.idlen));
-		File.read((char*)&Head.color_map_type,       sizeof(Head.color_map_type));
-		File.read((char*)&Head.image_type,           sizeof(Head.image_type));
-		File.read((char*)&Head.color_map_origin,     sizeof(Head.color_map_origin));
-		File.read((char*)&Head.color_map_length,     sizeof(Head.color_map_length));
-		File.read((char*)&Head.color_map_entry_size, sizeof(Head.color_map_entry_size));
-		File.read((char*)&Head.x_origin,             sizeof(Head.x_origin));
-		File.read((char*)&Head.y_origin,             sizeof(Head.y_origin));
-		File.read((char*)&Head.width,                sizeof(Head.width));
-		File.read((char*)&Head.height,               sizeof(Head.height));
-		File.read((char*)&Head.bits,                 sizeof(Head.bits));
-		File.read((char*)&Head.image_descriptor,     sizeof(Head.image_descriptor));
+		File.read((char*)&Head.IDLength,          sizeof(Head.IDLength));
+		File.read((char*)&Head.ColorMapType,      sizeof(Head.ColorMapType));
+		File.read((char*)&Head.ImageType,         sizeof(Head.ImageType));
+		File.read((char*)&Head.ColorMapOrigin,    sizeof(Head.ColorMapOrigin));
+		File.read((char*)&Head.ColorMapLength,    sizeof(Head.ColorMapLength));
+		File.read((char*)&Head.ColorMapEntrySize, sizeof(Head.ColorMapEntrySize));
+		File.read((char*)&Head.XOrigin,           sizeof(Head.XOrigin));
+		File.read((char*)&Head.YOrigin,           sizeof(Head.YOrigin));
+		File.read((char*)&Head.Width,             sizeof(Head.Width));
+		File.read((char*)&Head.Height,            sizeof(Head.Height));
+		File.read((char*)&Head.Bits,              sizeof(Head.Bits));
+		File.read((char*)&Head.ImageDescriptor,   sizeof(Head.ImageDescriptor));
 
-		uint8_t* Descriptor = new uint8_t[Head.image_descriptor];
-		File.read((char*)Descriptor, Head.image_descriptor);
+		uint8_t* Descriptor = new uint8_t[Head.ImageDescriptor];
+		File.read((char*)Descriptor, Head.ImageDescriptor);
 
-		size_t ColorMapElementSize = Head.color_map_entry_size / 8;
-		size_t ColorMapSize = Head.color_map_length * ColorMapElementSize;
+		size_t ColorMapElementSize = Head.ColorMapEntrySize / 8;
+		size_t ColorMapSize = Head.ColorMapLength * ColorMapElementSize;
 		uint8_t* ColorMap = new uint8_t[ColorMapSize];
 
-		if (Head.color_map_type == 1)
+		if (Head.ColorMapType == 1)
 		{
 			File.read((char*)ColorMap, ColorMapSize);
 		}
 
-		size_t PixelSize = Head.color_map_length == 0 ? (Head.bits / 8) : ColorMapElementSize;
-		size_t DataSize = FileSize - sizeof(Header);
-		size_t ImageSize = Head.width * Head.height * PixelSize;
+		size_t PixelSize = Head.ColorMapLength == 0 ? (Head.Bits / 8) : ColorMapElementSize;
+		size_t DataSize = FileSize - sizeof(Header) - (Head.ColorMapType == 1 ? ColorMapSize : 0);
+		size_t ImageSize = Head.Width * Head.Height * PixelSize;
 
 		uint8_t* Buffer = new uint8_t[DataSize];
 		File.read((char*)Buffer, DataSize);
@@ -309,25 +349,25 @@ namespace tga
 		Data = new uint8_t[ImageSize];
 		memset(Data, 0, ImageSize);
 
-		switch (Head.image_type)
+		switch (Head.ImageType)
 		{
 		case 0: break; // No Image
 		case 1: // Uncompressed paletted
 		{
-			if (Head.bits == 8)
+			if (Head.Bits == 8)
 			{
 				switch (PixelSize)
 				{
-				case 3: RGBPaletted((uint8_t*)Buffer, ColorMap, Data, Head.width * Head.height);  break;
-				case 4: RGBAPaletted((uint8_t*)Buffer, ColorMap, Data, Head.width * Head.height); break;
+				case 3: RGBPaletted ((uint8_t*)Buffer, ColorMap, Data, Head.Width * Head.Height); break;
+				case 4: RGBAPaletted((uint8_t*)Buffer, ColorMap, Data, Head.Width * Head.Height); break;
 				}
 			}
-			else if (Head.bits == 16)
+			else if (Head.Bits == 16)
 			{
 				switch (PixelSize)
 				{
-				case 3: RGBPaletted((uint16_t*)Buffer, ColorMap, Data, Head.width * Head.height);  break;
-				case 4: RGBAPaletted((uint16_t*)Buffer, ColorMap, Data, Head.width * Head.height); break;
+				case 3: RGBPaletted ((uint16_t*)Buffer, ColorMap, Data, Head.Width * Head.Height); break;
+				case 4: RGBAPaletted((uint16_t*)Buffer, ColorMap, Data, Head.Width * Head.Height); break;
 				}
 			}
 
@@ -335,7 +375,7 @@ namespace tga
 		}
 		case 2: // Uncompressed TrueColor
 		{
-			if (Head.bits = 24 || Head.bits == 32)
+			if (Head.Bits = 24 || Head.Bits == 32)
 			{
 				std::copy(&Buffer[0], &Buffer[ImageSize], &Data[0]);
 
@@ -350,7 +390,7 @@ namespace tga
 
 		case 3: // Uncompressed Monochrome
 		{
-			if (Head.bits == 8)
+			if (Head.Bits == 8)
 			{
 				std::copy(&Buffer[0], &Buffer[ImageSize], &Data[0]);
 			}
@@ -361,13 +401,10 @@ namespace tga
 		case 9: break; // Compressed paletted TODO
 		case 10: // Compressed TrueColor
 		{
-			if (Head.bits == 24)
+			switch (Head.Bits)
 			{
-				RGBCompressed(Buffer, Data, Head.width * Head.height);
-			}
-			else if (Head.bits == 32)
-			{
-				RGBACompressed(Buffer, Data, Head.width * Head.height);
+			case 24: RGBCompressed (Buffer, Data, Head.Width * Head.Height); break;
+			case 32: RGBACompressed(Buffer, Data, Head.Width * Head.Height); break;
 			}
 
 			break;
@@ -375,18 +412,16 @@ namespace tga
 
 		case 11: // Compressed Monocrhome
 		{
-			if (Head.bits == 8)
+			if (Head.Bits == 8)
 			{
-				MonochromeCompressed(Buffer, Data, Head.width * Head.height);
+				MonochromeCompressed(Buffer, Data, Head.Width * Head.Height);
 			}
 
 			break;
 		}
 		}
 
-		Format = ImageFormat::Undefined;
-
-		if (Head.image_type != 0)
+		if (Head.ImageType != 0)
 		{
 			switch (PixelSize)
 			{
@@ -395,9 +430,9 @@ namespace tga
 			case 4: Format = ImageFormat::RGBA;       break;
 			}
 
-			Width = Head.width;
-			Height = Head.height;
-			Size = Head.width * Head.height * PixelSize;
+			Width = Head.Width;
+			Height = Head.Height;
+			Size = ImageSize;
 		}
 
 		delete[] ColorMap;
@@ -405,13 +440,6 @@ namespace tga
 
 		return true;
 	}
-
-#undef READPIXEL8
-#undef READPIXEL24
-#undef READPIXEL32
-#undef WRITEPIXEL8
-#undef WRITEPIXEL24
-#undef WRITEPIXEL32
 
 }
 
