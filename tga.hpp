@@ -5,6 +5,11 @@
 #include <string>
 #include <fstream>
 
+/*!
+* @file tga.hpp
+* @brief Library header wth all functional.
+*/
+
 namespace tga
 {
 
@@ -32,7 +37,7 @@ namespace tga
         WRITEPIXEL24(a) \
 		*a++ = alpha;
 
-	struct Header
+	static struct Header
 	{
 		uint8_t idlen;
 		uint8_t color_map_type;
@@ -50,6 +55,9 @@ namespace tga
 		uint8_t image_descriptor;
 	};
 
+	/*
+	* @brief Format of loaded image.
+	*/
 	enum class ImageFormat
 	{
 		Monochrome,
@@ -58,6 +66,26 @@ namespace tga
 		Undefined
 	};
 
+	/**
+	* @brief Main TGA class.
+	*
+	* **Destructor deletes data. Pointer obtained with 'GetData' invalidates after destructing TGA object.** 
+	*
+	* # Examples
+	*
+	* ```cpp
+	* #include "tga.hpp"
+	* 
+	* tga::TGA tga;
+	* if (!tga.Load("image.tga")) error();
+	*
+	* uint8_t* Data = tga.GetData();
+	* uint64_t Size = tga.GetSize();
+	* uint32_t Width = tga.GetWidth();
+	* uint32_t Height = tga.GetHeight();
+	* tga::ImageFormat Format = tga.GetFormat();
+	* ```
+	*/
 	class TGA
 	{
 	private:
@@ -85,6 +113,11 @@ namespace tga
 		uint32_t GetHeight() const { return Height; }
 		ImageFormat GetFormat() const { return Format; }
 
+		/**
+		* @brief Loads image.
+		* @param Filename Image filename.
+		* @return true if success, otherwise false.
+		*/
 		bool Load(const std::string& Filename);
 
 		~TGA()
@@ -351,16 +384,21 @@ namespace tga
 		}
 		}
 
-		switch (PixelSize)
-		{
-		case 1: Format = ImageFormat::Monochrome; break;
-		case 3: Format = ImageFormat::RGB;        break;
-		case 4: Format = ImageFormat::RGBA;       break;
-		}
+		Format = ImageFormat::Undefined;
 
-		Width = Head.width;
-		Height = Head.height;
-		Size = Head.width * Head.height * PixelSize;
+		if (Head.image_type != 0)
+		{
+			switch (PixelSize)
+			{
+			case 1: Format = ImageFormat::Monochrome; break;
+			case 3: Format = ImageFormat::RGB;        break;
+			case 4: Format = ImageFormat::RGBA;       break;
+			}
+
+			Width = Head.width;
+			Height = Head.height;
+			Size = Head.width * Head.height * PixelSize;
+		}
 
 		delete[] ColorMap;
 		delete[] Descriptor;
